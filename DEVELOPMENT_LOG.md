@@ -44,3 +44,18 @@
 | Places API (New) 而非舊版 | 舊版 Places API 已停止對新專案開放，新版用 FieldMask 精準控制計費 |
 | CSV 加 UTF-8 BOM | Excel 直接開啟中文才不會亂碼 |
 | API Key 走 `.env` | repo 是公開的，金鑰絕不能 commit |
+
+---
+
+## 第 2 輪開發（2026-07-03）｜需求追加：地理分類
+
+### 對話過程記錄
+
+> 喔對我還有一個需求，需要用「新北/板橋區」這樣去分類，我要把店家區分地理縣市。
+
+### 實作方式
+
+- FieldMask 加入 `places.addressComponents`，從 API 的結構化地址元件直接取出縣市（`administrative_area_level_1`）與行政區（`administrative_area_level_2` / `locality`）
+- 元件拆不到時，退回用正規表達式解析 `formattedAddress`（`XX市/縣` + `XX區/鄉/鎮/市`）
+- CSV 最前面新增「縣市」「行政區」兩欄，Excel 可直接篩選或做樞紐分析
+- 輸出前依「縣市 → 行政區」排序，同區店家排在一起，方便業務分區開發

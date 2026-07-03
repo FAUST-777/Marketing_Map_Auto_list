@@ -34,6 +34,7 @@ if (!query) {
 const FIELD_MASK = [
   "places.displayName",
   "places.formattedAddress",
+  "places.addressComponents",
   "places.nationalPhoneNumber",
   "places.websiteUri",
   "places.rating",
@@ -61,6 +62,28 @@ async function searchPage(pageToken) {
   return res.json();
 }
 
+// 從 addressComponents 拆出縣市與行政區；拆不到時退回用地址字串解析
+function extractRegion(place) {
+  let city = "";
+  let district = "";
+  for (const c of place.addressComponents || []) {
+    const types = c.types || [];
+    const name = c.longText || "";
+    if (types.includes("administrative_area_level_1")) city = name;
+    if (types.includes("administrative_area_level_2") || types.includes("locality")) {
+      if (/[鄉鎮市區]$/.test(name) && name !== city) district = name;
+    }
+  }
+  if (!city || !district) {
+    const m = (place.formattedAddress || "").match(/([^\s,0-9]{1,3}[縣市])([^\s,0-9]{1,3}[鄉鎮市區])/);
+    if (m) {
+      if (!city) city = m[1];
+      if (!district) district = m[2];
+    }
+  }
+  return { city, district };
+}
+
 function csvEscape(v) {
   const s = String(v == null ? "" : v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -76,22 +99,29 @@ function csvEscape(v) {
     pageToken = data.nextPageToken || null;
   } while (pageToken && places.length < maxResults);
 
-  const rows = places.slice(0, maxResults).map((p) => [
-    p.displayName?.text || "",
-    p.nationalPhoneNumber || "",
-    p.formattedAddress || "",
-    p.websiteUri || "",
-    p.rating ?? "",
-    p.userRatingCount ?? "",
-    p.googleMapsUri || "",
-  ]);
+  const rows = places.slice(0, maxResults).map((p) => {
+    const { city, district } = extractRegion(p);
+    return [
+      city,
+      district,
+      p.displayName?.text || "",
+      p.nationalPhoneNumber || "",
+      p.formattedAddress || "",
+      p.websiteUri || "",
+      p.rating ?? "",
+      p.userRatingCount ?? "",
+      p.googleMapsUri || "",
+    ];
+  });
+  // 依 縣市 → 行政區 排序，同區店家排在一起
+  rows.sort((a, b) => a[0].localeCompare(b[0], "zh-TW") || a[1].localeCompare(b[1], "zh-TW"));
 
   if (rows.length === 0) {
     console.log("查無結果，請換個關鍵字試試（例如加上區域名稱）。");
     return;
   }
 
-  const header = ["店名", "電話", "地址", "網站", "評分", "評論數", "Google Maps 連結"];
+  const header = ["縣市", "行政區", "店名", "電話", "地址", "網站", "評分", "評論數", "Google Maps 連結"];
   const csv = "﻿" + [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\r\n");
 
   const outDir = path.join(__dirname, "output");
@@ -101,7 +131,7 @@ function csvEscape(v) {
   const outFile = path.join(outDir, `${safeName}_${date}.csv`);
   fs.writeFileSync(outFile, csv);
 
-  const withPhone = rows.filter((r) => r[1]).length;
+  const withPhone = rows.filter((r) => r[3]).length;
   console.log(`完成！共 ${rows.length} 筆（其中 ${withPhone} 筆有電話）`);
   console.log(`檔案：${outFile}`);
 })().catch((err) => {
