@@ -35,6 +35,9 @@ const FIELD_MASK = [
   "places.displayName",
   "places.formattedAddress",
   "places.addressComponents",
+  "places.primaryType",
+  "places.primaryTypeDisplayName",
+  "places.types",
   "places.nationalPhoneNumber",
   "places.websiteUri",
   "places.rating",
@@ -84,6 +87,31 @@ function extractRegion(place) {
   return { city, district };
 }
 
+// Google primaryType（英文代碼）→ 商業大類（中文）
+const CATEGORY_RULES = [
+  [/restaurant|cafe|coffee|bakery|bar$|food|meal|dessert|ice_cream|tea_house|breakfast|brunch|pizza|hamburger|noodle|ramen|sushi|hot_pot|barbecue|buffet|steak|seafood|vegetarian|juice|catering|deli|confectionery|donut|bagel|sandwich|wine_bar|pub/, "餐飲"],
+  [/hospital|dental|dentist|doctor|clinic|pharmacy|drugstore|physiotherap|medical|health|veterinar|chiropract|wellness/, "醫療保健"],
+  [/beauty|hair|spa$|nail|barber|massage|skin_care|tanning|makeup/, "美容美體"],
+  [/gym|fitness|yoga|sports|swimming|golf|martial_arts|dance|bowling|climbing/, "運動健身"],
+  [/school|university|academy|education|tutor|preschool|kindergarten|library/, "教育"],
+  [/hotel|lodging|motel|hostel|resort|bed_and_breakfast|guest_house|campground/, "住宿"],
+  [/car_|auto_|motorcycle|gas_station|parking|electric_vehicle/, "汽機車"],
+  [/bank|atm|finance|insurance|accounting|money_transfer/, "金融"],
+  [/real_estate/, "不動產"],
+  [/lawyer|legal|notary/, "法律"],
+  [/store$|shop$|market|mall|shopping|boutique|florist|jewelr|pet_|hardware|furniture|electronics|grocery|supermarket|convenience|liquor|book|gift/, "零售"],
+  [/travel|tour|amusement|aquarium|zoo|museum|movie|night_club|karaoke|park$|casino|event_venue/, "旅遊娛樂"],
+  [/church|temple|mosque|synagogue|place_of_worship/, "宗教"],
+];
+
+function classify(place) {
+  const key = place.primaryType || (place.types || [])[0] || "";
+  for (const [re, label] of CATEGORY_RULES) {
+    if (re.test(key)) return label;
+  }
+  return key ? "其他" : "";
+}
+
 function csvEscape(v) {
   const s = String(v == null ? "" : v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -104,6 +132,8 @@ function csvEscape(v) {
     return [
       city,
       district,
+      classify(p),
+      p.primaryTypeDisplayName?.text || "",
       p.displayName?.text || "",
       p.nationalPhoneNumber || "",
       p.formattedAddress || "",
@@ -121,7 +151,7 @@ function csvEscape(v) {
     return;
   }
 
-  const header = ["縣市", "行政區", "店名", "電話", "地址", "網站", "評分", "評論數", "Google Maps 連結"];
+  const header = ["縣市", "行政區", "商業大類", "商業類型", "店名", "電話", "地址", "網站", "評分", "評論數", "Google Maps 連結"];
   const csv = "﻿" + [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\r\n");
 
   const outDir = path.join(__dirname, "output");
@@ -131,7 +161,7 @@ function csvEscape(v) {
   const outFile = path.join(outDir, `${safeName}_${date}.csv`);
   fs.writeFileSync(outFile, csv);
 
-  const withPhone = rows.filter((r) => r[3]).length;
+  const withPhone = rows.filter((r) => r[5]).length;
   console.log(`完成！共 ${rows.length} 筆（其中 ${withPhone} 筆有電話）`);
   console.log(`檔案：${outFile}`);
 })().catch((err) => {
