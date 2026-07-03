@@ -101,3 +101,29 @@
 2. 建 API Key → 填入 `.env` 的 `GOOGLE_MAPS_API_KEY`
 3. 建服務帳戶 + JSON 金鑰 → 存成 `service-account.json`
 4. 把目標 Sheet 分享給服務帳戶 email（編輯者）
+
+---
+
+## 第 5 輪開發（2026-07-03）｜Google Cloud 申請自動化 & 首次實測成功
+
+### 對話過程記錄
+
+> 妳幫我去申請，Google 網頁我有點看不懂。
+
+使用者已自行建立 Cloud 專案（aerobic-form-433316-h6）但看不懂 Console 網頁。解法：安裝 gcloud CLI（winget），使用者只做一次 `gcloud auth login`，其餘申請全用指令完成。
+
+### 完成項目（全程指令，未碰網頁）
+
+1. winget 安裝 Google Cloud SDK（第一次 msstore 來源憑證錯誤，改指定 `--source winget` 成功）
+2. `gcloud services enable` 啟用 Places API (New) + Google Sheets API
+3. 建立服務帳戶 `marketing-map-bot@aerobic-form-433316-h6.iam.gserviceaccount.com` + JSON 金鑰
+4. `gcloud services api-keys create` 建立 API Key（已限制只能呼叫 Places API）
+5. 實測「板橋 牙醫診所」：20 筆全有電話，並成功寫入使用者的 Google Sheet
+
+### 遇到的問題與解決
+
+**問題：部分店家的行政區欄位是空的**
+Google 對部分店家回傳簡體字地址（「板桥区」），原本的正規表達式只認繁體「區」。
+解法：加入簡轉繁字元對照表（台灣地名常見字），addressComponents 與地址字串解析前先轉繁體。修正後 20/20 筆行政區全部正確。
+
+**備註：** 專案尚未綁定計費帳戶，但 Places API 實測可用（免費額度內）。若未來出現 `BILLING_DISABLED` 類錯誤，需到 Cloud Console 綁定計費帳戶。

@@ -69,20 +69,27 @@ async function searchPage(pageToken) {
   return res.json();
 }
 
+// Google 部分店家的地址元件是簡體字，轉回繁體（台灣地名常見字）
+const S2T = { 区: "區", 乡: "鄉", 镇: "鎮", 县: "縣", 桥: "橋", 庄: "莊", 芦: "蘆", 坜: "壢", 岛: "島", 湾: "灣", 凤: "鳳", 冈: "岡", 莺: "鶯", 树: "樹", 峡: "峽", 双: "雙", 沥: "瀝", 龙: "龍", 潭: "潭", 芗: "薌", 头: "頭", 屿: "嶼", 义: "義", 万: "萬", 丰: "豐", 荣: "榮", 兰: "蘭", 竹: "竹", 苓: "苓", 盐: "鹽", 埕: "埕", 内: "內", 门: "門", 关: "關", 鸟: "鳥", 松: "松" };
+function toTraditional(s) {
+  return s.replace(/./g, (ch) => S2T[ch] || ch);
+}
+
 // 從 addressComponents 拆出縣市與行政區；拆不到時退回用地址字串解析
 function extractRegion(place) {
   let city = "";
   let district = "";
   for (const c of place.addressComponents || []) {
     const types = c.types || [];
-    const name = c.longText || "";
+    const name = toTraditional(c.longText || "");
     if (types.includes("administrative_area_level_1")) city = name;
     if (types.includes("administrative_area_level_2") || types.includes("locality")) {
       if (/[鄉鎮市區]$/.test(name) && name !== city) district = name;
     }
   }
   if (!city || !district) {
-    const m = (place.formattedAddress || "").match(/([^\s,0-9]{1,3}[縣市])([^\s,0-9]{1,3}[鄉鎮市區])/);
+    const addr = toTraditional(place.formattedAddress || "");
+    const m = addr.match(/([^\s,0-9]{1,3}[縣市])([^\s,0-9]{1,3}[鄉鎮市區])/);
     if (m) {
       if (!city) city = m[1];
       if (!district) district = m[2];
