@@ -36,6 +36,7 @@ GOOGLE_MAPS_API_KEY=你的KEY
 ```bash
 node search.js "板橋 牙醫診所"
 node search.js "新莊 健身房" --max 60
+node search.js "板橋 牙醫診所" --sheet   # 同時寫入 Google Sheet
 ```
 
 執行完會在 `output/` 資料夾產生 CSV 檔（UTF-8 BOM，Excel 直接雙擊開啟中文不會亂碼），欄位包含：
@@ -55,6 +56,18 @@ node search.js "新莊 健身房" --max 60
 | Google Maps 連結 | 點開即可看店家頁面 |
 
 名單會先依「縣市 → 行政區」排序，同區店家排在一起，方便業務按地理區域分批開發。
+
+## 寫入 Google Sheet（--sheet）
+
+加上 `--sheet` 參數會把結果同步寫進 Google Sheet（每次搜尋開一個分頁，分頁名 = 關鍵字 + 日期，重跑會清空重寫該分頁）。
+
+一次性設定（跟 API Key 同一個 Google Cloud 專案即可）：
+
+1. Cloud Console 啟用 **Google Sheets API**
+2. 「IAM 與管理 → 服務帳戶」建立服務帳戶 → 金鑰 → 新增金鑰（JSON）
+3. 下載的 JSON 存成專案資料夾內的 `service-account.json`（已 gitignore，不會上 GitHub）
+4. 打開你的 Google Sheet → 共用 → 把服務帳戶的 email（`xxx@xxx.iam.gserviceaccount.com`）加為**編輯者**
+5. `.env` 填入 `GOOGLE_SHEET_ID`（Sheet 網址 `/d/` 後面那串）
 
 ## 費用說明
 

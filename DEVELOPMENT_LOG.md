@@ -76,3 +76,28 @@
 - 新增兩欄：
   - **商業大類** — 用規則表把 Google 細分類歸納成 13 個中文大類（餐飲、醫療保健、美容美體、運動健身、教育、住宿、汽機車、金融、不動產、法律、零售、旅遊娛樂、宗教），對不上的歸「其他」
   - **商業類型** — Google 原始細分類的中文顯示名，保留細節（火鍋店 vs 咖啡廳都屬餐飲大類）
+
+---
+
+## 第 4 輪開發（2026-07-03）｜需求追加：自動寫入 Google Sheet
+
+### 對話過程記錄
+
+> 好那現在我開一個 Google Sheet，妳把資料倒入進去（提供了 Sheet 網址）。
+
+現況：機器上沒有現成 Google 憑證（無 gcloud、無服務帳戶金鑰），Places API Key 也尚未申請，因此先把功能完整做好，等憑證備齊即可執行。
+
+### 實作方式
+
+- 新增 `sheets.js`：零相依的 Google Sheets 寫入模組
+  - 用 Node 內建 `crypto` 對服務帳戶金鑰簽 RS256 JWT，換取 access token（不裝 googleapis 套件）
+  - 分頁不存在自動建立；已存在則清空重寫
+- `search.js` 加 `--sheet` 參數：搜尋完除了輸出 CSV，同步寫入 `.env` 的 `GOOGLE_SHEET_ID`，分頁名 = 關鍵字 + 日期
+- `.gitignore` 加入 `service-account.json`（repo 公開，金鑰不上傳）
+
+### 待使用者完成（一次性設定）
+
+1. Google Cloud Console 建專案、啟用 **Places API (New)** + **Google Sheets API**
+2. 建 API Key → 填入 `.env` 的 `GOOGLE_MAPS_API_KEY`
+3. 建服務帳戶 + JSON 金鑰 → 存成 `service-account.json`
+4. 把目標 Sheet 分享給服務帳戶 email（編輯者）

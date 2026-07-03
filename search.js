@@ -25,9 +25,13 @@ if (!API_KEY) {
 const args = process.argv.slice(2);
 const maxIdx = args.indexOf("--max");
 const maxResults = maxIdx >= 0 ? Math.min(parseInt(args[maxIdx + 1], 10) || 60, 60) : 60;
-const query = args.filter((_, i) => maxIdx < 0 || (i !== maxIdx && i !== maxIdx + 1))[0];
+const toSheet = args.includes("--sheet");
+const query = args.filter(
+  (a, i) => a !== "--sheet" && (maxIdx < 0 || (i !== maxIdx && i !== maxIdx + 1))
+)[0];
 if (!query) {
-  console.error('用法：node search.js "板橋 牙醫診所" [--max 60]');
+  console.error('用法：node search.js "板橋 牙醫診所" [--max 60] [--sheet]');
+  console.error("  --sheet：同時把結果寫入 .env 設定的 Google Sheet（分頁名 = 搜尋關鍵字）");
   process.exit(1);
 }
 
@@ -164,6 +168,19 @@ function csvEscape(v) {
   const withPhone = rows.filter((r) => r[5]).length;
   console.log(`完成！共 ${rows.length} 筆（其中 ${withPhone} 筆有電話）`);
   console.log(`檔案：${outFile}`);
+
+  if (toSheet) {
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    if (!sheetId) {
+      console.error("錯誤：--sheet 需要在 .env 設定 GOOGLE_SHEET_ID（Sheet 網址中 /d/ 後面那串）。");
+      process.exit(1);
+    }
+    const { writeToSheet } = require("./sheets");
+    const tabName = `${query} ${date}`.slice(0, 90);
+    console.log(`寫入 Google Sheet 分頁「${tabName}」…`);
+    const url = await writeToSheet(sheetId, tabName, [header, ...rows]);
+    console.log(`已寫入：${url}`);
+  }
 })().catch((err) => {
   console.error("執行失敗：", err.message);
   process.exit(1);
