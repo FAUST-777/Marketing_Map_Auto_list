@@ -51,8 +51,11 @@ if (areas.length === 0 || !keywords || keywords.length === 0) {
   }
 
   // 只保留搜尋地區內的店家（Google 有時會回傳鄰近地區的結果）
-  const areaRe = new RegExp(areas.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
-  const rows = sortRows([...seen.values()].filter((r) => areaRe.test(r[1]) || areaRe.test(r[6])));
+  // 台/臺互通：Google 官方地址寫「臺北市」，搜尋關鍵字慣用「台北」，兩種寫法都要能對上
+  const areaRe = new RegExp(
+    areas.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[台臺]/g, "[台臺]")).join("|")
+  );
+  const rows = sortRows([...seen.values()].filter((r) => areaRe.test(r[0]) || areaRe.test(r[1]) || areaRe.test(r[6])));
 
   if (rows.length === 0) {
     console.log("查無結果。");
