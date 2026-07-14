@@ -3,6 +3,8 @@
  * 批次搜尋：多個地區 × 多個關鍵字，合併去重成一份名單
  * 用法：node batch.js --areas "板橋,中和" --keywords "餐廳,小吃,甜點店,咖啡廳" [--name 名單名稱] [--sheet]
  * 也可用內建的食物關鍵字組：node batch.js --areas "板橋,中和" --preset food --sheet
+ * --prefix 台中：區名是通用名稱（東區、北區…）時必加，查詢會變成「台中東區 餐廳」，
+ *               且過濾會要求縣市/地址包含前綴，避免抓到台南東區、新竹北區等外縣市同名區
  */
 const { searchPlaces, placeToRow, sortRows, writeCsv, HEADER } = require("./lib");
 
@@ -16,6 +18,7 @@ function getOpt(name) {
   return i >= 0 ? args[i + 1] : null;
 }
 const areas = (getOpt("areas") || "").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+const prefix = getOpt("prefix"); // 縣市前綴，例：台中
 const preset = getOpt("preset");
 const keywords = preset
   ? PRESETS[preset]
@@ -31,7 +34,7 @@ if (areas.length === 0 || !keywords || keywords.length === 0) {
 
 (async () => {
   const queries = [];
-  for (const area of areas) for (const kw of keywords) queries.push(`${area} ${kw}`);
+  for (const area of areas) for (const kw of keywords) queries.push(`${prefix ? prefix + area : area} ${kw}`);
   console.log(`批次搜尋 ${queries.length} 組關鍵字（${areas.join("、")} × ${keywords.join("、")}）…`);
 
   const seen = new Map(); // googleMapsUri（去掉追蹤參數）→ row
@@ -55,7 +58,16 @@ if (areas.length === 0 || !keywords || keywords.length === 0) {
   const areaRe = new RegExp(
     areas.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[台臺]/g, "[台臺]")).join("|")
   );
-  const rows = sortRows([...seen.values()].filter((r) => areaRe.test(r[0]) || areaRe.test(r[1]) || areaRe.test(r[6])));
+  // 優先比對縣市/行政區欄位，避免撞到外縣市的同名路名（例：搜「員山」誤收中和區員山路）；
+  // 行政區解析不出來時才退回比對完整地址
+  // 有 --prefix 時再加一道縣市檢查，擋掉外縣市的同名行政區（例：台南東區、新竹北區）
+  const cityRe = prefix ? new RegExp(prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[台臺]/g, "[台臺]")) : null;
+  const rows = sortRows(
+    [...seen.values()].filter((r) => {
+      if (cityRe && !(cityRe.test(r[0]) || cityRe.test(r[6]))) return false;
+      return r[1] ? areaRe.test(r[0]) || areaRe.test(r[1]) : areaRe.test(r[6]);
+    })
+  );
 
   if (rows.length === 0) {
     console.log("查無結果。");
